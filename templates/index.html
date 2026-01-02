@@ -1,0 +1,57 @@
+{{define "title"}}Expenses - Login or Register{{end}}
+
+{{define "styles"}}
+.button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+{{end}}
+
+{{define "content"}}
+<main class="container">
+    <article>
+        <header>
+            <h1>Welcome to Expenses</h1>
+            <p>Login to your account or create a new one</p>
+        </header>
+        
+        {{if .Error}}
+        <div class="error" role="alert">{{.Error}}</div>
+        {{end}}
+
+        <form id="auth-form" method="POST">
+            <label for="email">
+                Email
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    required 
+                    placeholder="your@email.com"
+                >
+            </label>
+
+            <label for="password">
+                Password
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required 
+                    placeholder="Enter your password"
+                >
+            </label>
+
+            <div class="button-group">
+                <button type="submit" name="action" value="login" formaction="/user/login">
+                    Login
+                </button>
+                <button type="submit" name="action" value="register" formaction="/user/register" class="secondary">
+                    Register
+                </button>
+            </div>
+        </form>
+    </article>
+</main>
+{{end}}

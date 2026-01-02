@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  GREETING: Hello, world!
+env:
+  GOOSE_DRIVER: postgres
+  GOOSE_DBSTRING: postgres://postgres:postgres@localhost:5432/expenses
+  GOOSE_MIGRATION_DIR: ./migrations
+  GOOSE_TABLE: goose.goose_migrations
+
+tasks:
+  default:
+    desc: Print a greeting message
+    cmds:
+      - echo "{{.GREETING}}"
+    silent: true
+
+  goose:
+    desc: handles any goose command, passed by as "taskfile goose -- <cmd>"
+    cmds:
+      - goose {{.CLI_ARGS}}

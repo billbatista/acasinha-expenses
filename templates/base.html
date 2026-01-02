@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{block "title" .}}Despesas{{end}}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.blue.min.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        main {
+            max-width: 400px;
+        }
+
+        .error {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            background-color: #fed7d7;
+            color: #c53030;
+        }
+
+        .error:empty {
+            display: none;
+        }
+
+        .profile-picture {
+            width: 200; 
+            height: 200px; 
+            border-radius: 5rem;
+            overflow: hidden; 
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: var(--pico-spacing);
+        }
+
+        {{block "styles" .}}{{end}}
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+        <ul>
+            <li><strong>A Casinha - Despesas</strong></li>
+        </ul>
+        <ul>
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/user/profile">Profile</a></li>
+        </ul>
+    </nav>
+    {{block "content" .}}{{end}}
+    </main>
+    {{block "scripts" .}}{{end}}
+</body>
+</html>
