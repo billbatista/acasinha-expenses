@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"html/template"
 	"io"
 	"log/slog"
@@ -9,13 +10,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/billbatista/acasinha-expenses/eventlogger"
+	"github.com/billbatista/acasinha-expenses/ledger"
 	"github.com/billbatista/acasinha-expenses/middleware"
 	"github.com/billbatista/acasinha-expenses/session"
 	"github.com/billbatista/acasinha-expenses/user"
 	chimiddleware "github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
@@ -36,6 +40,7 @@ func main() {
 
 	userRepo := user.NewRepository(db)
 	sessionRepo := session.NewRepository(db)
+	ledgerRepo := ledger.NewRepository(db)
 
 	router := chi.NewRouter()
 	router.Use(chimiddleware.Logger)
@@ -190,7 +195,110 @@ func main() {
 
 		r.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 			userID, _ := middleware.GetUserID(r.Context())
-			w.Write([]byte("Welcome to dashboard! User ID: " + userID.String()))
+
+			// Get user's first ledger
+			ledgerData, err := ledgerRepo.GetUserFirstLedger(r.Context(), userID.String())
+			if err != nil {
+				slog.Error("failed to get user ledger", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			// If user has no ledger, show creation prompt
+			if ledgerData == nil {
+				data := DashboardData{
+					Success: r.URL.Query().Get("success"),
+					Error:   r.URL.Query().Get("error"),
+				}
+
+				tmpl, err := template.ParseFiles("templates/base.html", "templates/dashboard.html")
+				if err != nil {
+					slog.Error("failed to parse template", "error", err)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				tmpl.ExecuteTemplate(w, "base.html", data)
+				return
+			}
+
+			members, err := ledgerRepo.GetLedgerMembers(r.Context(), ledgerData.ID.String())
+			if err != nil {
+				slog.Error("failed to get ledger members", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			expenses, err := ledgerRepo.GetRecentExpenses(r.Context(), ledgerData.ID.String(), 10)
+			if err != nil {
+				slog.Error("failed to get expenses", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			splits, err := ledgerRepo.GetExpenseSplits(r.Context(), ledgerData.ID.String())
+			if err != nil {
+				slog.Error("failed to get expense splits", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			memberIDs := make([]uuid.UUID, len(members))
+			memberNames := make(map[uuid.UUID]string)
+			for i, member := range members {
+				memberIDs[i] = member.UserID
+				// Get user names
+				u, err := userRepo.GetByID(r.Context(), member.UserID)
+				if err == nil && u != nil {
+					if u.Name != "" {
+						memberNames[member.UserID] = u.Name
+					} else {
+						memberNames[member.UserID] = u.Email
+					}
+				}
+			}
+
+			balances := ledger.CalculateBalances(expenses, splits, memberIDs)
+
+			balanceViews := make([]BalanceView, 0, len(balances))
+			for userID, amount := range balances {
+				balanceViews = append(balanceViews, BalanceView{
+					UserID:          userID,
+					UserName:        memberNames[userID],
+					Amount:          amount,
+					FormattedAmount: formatCurrency(amount),
+				})
+			}
+
+			expenseViews := make([]ExpenseView, 0, len(expenses))
+			for _, exp := range expenses {
+				expenseViews = append(expenseViews, ExpenseView{
+					ID:              exp.ID,
+					Description:     exp.Description,
+					PaidByName:      memberNames[exp.PaidBy],
+					Category:        exp.Category,
+					Amount:          exp.Amount,
+					FormattedAmount: formatCurrency(exp.Amount),
+					CreatedAt:       exp.CreatedAt,
+				})
+			}
+
+			data := DashboardData{
+				Ledger:   ledgerData,
+				Balances: balanceViews,
+				Expenses: expenseViews,
+				Success:  r.URL.Query().Get("success"),
+				Error:    r.URL.Query().Get("error"),
+			}
+
+			tmpl, err := template.ParseFiles("templates/base.html", "templates/dashboard.html")
+			if err != nil {
+				slog.Error("failed to parse template", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			tmpl.ExecuteTemplate(w, "base.html", data)
 		})
 
 		r.Get("/user/profile", func(w http.ResponseWriter, r *http.Request) {
@@ -321,6 +429,37 @@ func main() {
 
 	slog.Info("server starting", "port", 5000)
 	http.ListenAndServe(":5000", router)
+}
+
+// View types for templates
+type DashboardData struct {
+	Ledger   *ledger.Ledger
+	Balances []BalanceView
+	Expenses []ExpenseView
+	Success  string
+	Error    string
+}
+
+type BalanceView struct {
+	UserID          uuid.UUID
+	UserName        string
+	Amount          int64
+	FormattedAmount string
+}
+
+type ExpenseView struct {
+	ID              uuid.UUID
+	Description     string
+	PaidByName      string
+	Category        string
+	Amount          int64
+	FormattedAmount string
+	CreatedAt       time.Time
+}
+
+func formatCurrency(amountCents int64) string {
+	amount := float64(amountCents) / 100.0
+	return fmt.Sprintf("%s %.2f", "R$", amount)
 }
 
 func printErrorAndExit(msg string, e error) {

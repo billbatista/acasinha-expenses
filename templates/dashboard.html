@@ -1,0 +1,211 @@
+{{define "title"}}Dashboard - Despesas{{end}}
+
+{{define "styles"}}
+.balances-section {
+    margin-bottom: 2rem;
+}
+
+.balance-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.balance-card {
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    border: 2px solid;
+}
+
+.balance-card.positive {
+    background-color: rgba(72, 187, 120, 0.1);
+    border-color: #48bb78;
+}
+
+.balance-card.negative {
+    background-color: rgba(245, 101, 101, 0.1);
+    border-color: #f56565;
+}
+
+.balance-card.neutral {
+    background-color: rgba(160, 174, 192, 0.1);
+    border-color: #a0aec0;
+}
+
+.balance-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--pico-muted-color);
+    margin-bottom: 0.5rem;
+}
+
+.balance-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.balance-card.positive .balance-amount {
+    color: #48bb78;
+}
+
+.balance-card.negative .balance-amount {
+    color: #f56565;
+}
+
+.balance-card.neutral .balance-amount {
+    color: var(--pico-color);
+}
+
+.balance-status {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.expenses-section {
+    margin-top: 2rem;
+}
+
+.expenses-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.expenses-table th {
+    text-align: left;
+    padding: 0.75rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--pico-muted-border-color);
+    color: var(--pico-muted-color);
+}
+
+.expenses-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.expenses-table tr:last-child td {
+    border-bottom: none;
+}
+
+.expense-amount {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    background-color: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--pico-muted-color);
+}
+
+.add-expense-btn {
+    margin-top: 1rem;
+}
+{{end}}
+
+{{define "content"}}
+    <article>
+        <header>
+            <h1>Dashboard</h1>
+            {{if .Ledger}}
+            <p>{{.Ledger.Name}}</p>
+            {{end}}
+        </header>
+
+        {{if .Success}}
+        <div class="success" role="alert">{{.Success}}</div>
+        {{end}}
+
+        {{if .Error}}
+        <div class="error" role="alert">{{.Error}}</div>
+        {{end}}
+
+        {{if not .Ledger}}
+        <section class="empty-state">
+            <h2>Bem-vindo!</h2>
+            <p>Você ainda não tem um livro-razão criado.</p>
+            <p>Crie um para começar a controlar suas despesas compartilhadas.</p>
+            <button onclick="window.location.href='/ledger/create'">
+                Criar Livro-Razão
+            </button>
+        </section>
+        {{else}}
+
+        <section class="balances-section">
+            <h2>Saldos</h2>
+            <div class="balance-cards">
+                {{range .Balances}}
+                <div class="balance-card {{if gt .Amount 0}}positive{{else if lt .Amount 0}}negative{{else}}neutral{{end}}">
+                    <div class="balance-name">{{.UserName}}</div>
+                    <div class="balance-amount">{{.FormattedAmount}}</div>
+                    <div class="balance-status">
+                        {{if gt .Amount 0}}
+                            A receber
+                        {{else if lt .Amount 0}}
+                            A pagar
+                        {{else}}
+                            Equilibrado
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </section>
+
+        <section class="expenses-section">
+            <h2>Últimas Despesas</h2>
+            
+            {{if .Expenses}}
+            <table class="expenses-table">
+                <thead>
+                    <tr>
+                        <th>Pago por</th>
+                        <th>Descrição</th>
+                        <th>Categoria</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Expenses}}
+                    <tr>
+                        <td>{{.PaidByName}}</td>
+                        <td>{{.Description}}</td>
+                        <td>
+                            {{if .Category}}
+                            <span class="category-badge">{{.Category}}</span>
+                            {{else}}
+                            <span class="category-badge">Sem categoria</span>
+                            {{end}}
+                        </td>
+                        <td class="expense-amount">{{.FormattedAmount}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="empty-state">
+                <p>Nenhuma despesa adicionada ainda.</p>
+            </div>
+            {{end}}
+
+            <button class="add-expense-btn" onclick="window.location.href='/ledger/{{.Ledger.ID}}/add-expense'">
+                + Adicionar Despesa
+            </button>
+        </section>
+        {{end}}
+    </article>
+{{end}}
