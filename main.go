@@ -301,6 +301,56 @@ func main() {
 			tmpl.ExecuteTemplate(w, "base.html", data)
 		})
 
+		r.Get("/ledger/create", func(w http.ResponseWriter, r *http.Request) {
+			tmpl, err := template.ParseFiles("templates/base.html", "templates/create-ledger.html")
+			if err != nil {
+				slog.Error("failed to parse template", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			tmpl.ExecuteTemplate(w, "base.html", nil)
+		})
+
+		r.Post("/ledger/create", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "Invalid form data", http.StatusBadRequest)
+				return
+			}
+
+			name := r.FormValue("name")
+			currency := r.FormValue("currency")
+			userID, _ := middleware.GetUserID(r.Context())
+
+			newLedger, err := ledger.NewLedger(name, currency, userID)
+			if err != nil {
+				slog.Error("failed to create ledger", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			ledgerId, err := ledgerRepo.CreateNew(ctx, newLedger)
+			if err != nil {
+				slog.Error("failed to save ledger", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			evt := eventlogger.NewEvent(
+				eventlogger.WithType("ledger.created"),
+				eventlogger.WithData(map[string]string{
+					"user_id":   userID.String(),
+					"name":      name,
+					"ledger_id": ledgerId,
+					"currency":  currency,
+				}),
+			)
+			worker.Log(evt)
+
+			http.Redirect(w, r, fmt.Sprintf("/ledger/%s", ledgerId), http.StatusSeeOther)
+		})
+
 		r.Get("/user/profile", func(w http.ResponseWriter, r *http.Request) {
 			userID, _ := middleware.GetUserID(r.Context())
 
