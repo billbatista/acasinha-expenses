@@ -13,26 +13,35 @@ func NewRepository(db *sql.DB) *repository {
 	return &repository{db: db}
 }
 
-func (r *repository) SaveNewLedger(ctx context.Context, ledger Ledger) error {
+func (r *repository) CreateNew(ctx context.Context, ledger Ledger) (string, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
+	var lastId string
 	if err != nil {
-		return err
+		return lastId, err
 	}
 	defer tx.Rollback()
 
-	insertLedger := `INSERT INTO ledgers (id, name, created_by, created_at) VALUES ($1, $2, $3, $4)`
-	_, err = tx.ExecContext(ctx, insertLedger, ledger.ID, ledger.Name, ledger.CreatedBy, ledger.CreatedAt)
+	insertLedger := `INSERT INTO ledgers (id, name, currency, created_by, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	err = tx.QueryRowContext(
+		ctx,
+		insertLedger,
+		ledger.ID,
+		ledger.Name,
+		ledger.Currency,
+		ledger.CreatedBy,
+		ledger.CreatedAt,
+	).Scan(&lastId)
 	if err != nil {
-		return err
+		return lastId, err
 	}
 
 	insertLedgerUser := `INSERT INTO ledger_users (ledger_id, user_id) VALUES ($1, $2)`
 	_, err = tx.ExecContext(ctx, insertLedgerUser, ledger.ID, ledger.CreatedBy)
 	if err != nil {
-		return err
+		return lastId, err
 	}
 
-	return tx.Commit()
+	return lastId, tx.Commit()
 }
 
 func (r *repository) SaveExpense(ctx context.Context, expense Expense, splits []ExpenseSplit) error {
@@ -71,7 +80,7 @@ func (r *repository) SaveExpense(ctx context.Context, expense Expense, splits []
 }
 
 func (r *repository) GetLedgerByID(ctx context.Context, ledgerID string) (*Ledger, error) {
-	query := `SELECT id, name, currency, created_by, created_at, updated_at FROM ledgers WHERE id = $1`
+	query := `SELECT id, name, currency, created_by, created_at FROM ledgers WHERE id = $1`
 
 	var ledger Ledger
 	err := r.db.QueryRowContext(ctx, query, ledgerID).Scan(
@@ -80,7 +89,6 @@ func (r *repository) GetLedgerByID(ctx context.Context, ledgerID string) (*Ledge
 		&ledger.Currency,
 		&ledger.CreatedBy,
 		&ledger.CreatedAt,
-		&ledger.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -179,7 +187,7 @@ func (r *repository) GetExpenseSplits(ctx context.Context, ledgerID string) ([]E
 }
 
 func (r *repository) GetUserFirstLedger(ctx context.Context, userID string) (*Ledger, error) {
-	query := `SELECT l.id, l.name, l.currency, l.created_by, l.created_at, l.updated_at 
+	query := `SELECT l.id, l.name, l.currency, l.created_by, l.created_at 
               FROM ledgers l
               INNER JOIN ledger_users lu ON l.id = lu.ledger_id
               WHERE lu.user_id = $1
@@ -193,7 +201,6 @@ func (r *repository) GetUserFirstLedger(ctx context.Context, userID string) (*Le
 		&ledger.Currency,
 		&ledger.CreatedBy,
 		&ledger.CreatedAt,
-		&ledger.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -20,7 +20,6 @@ type Ledger struct {
 	Currency  string    `json:"currency,omitempty"`
 	CreatedBy uuid.UUID `json:"created_by,omitempty"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
 type Expense struct {
@@ -60,24 +59,23 @@ var (
 	ErrEmptyDescription = errors.New("description can't be empty")
 )
 
-func NewLedger(name string, currency string, createdBy uuid.UUID) (*Ledger, error) {
+func NewLedger(name string, currency string, createdBy uuid.UUID) (Ledger, error) {
 	if name == "" {
-		return nil, ErrEmptyName
+		return Ledger{}, ErrEmptyName
 	}
 
 	if currency == "" {
-		return nil, ErrEmptyCurrency
+		return Ledger{}, ErrEmptyCurrency
 	}
 
 	now := time.Now().UTC()
 
-	return &Ledger{
+	return Ledger{
 		ID:        uuid.New(),
 		Name:      name,
 		Currency:  currency,
 		CreatedBy: createdBy,
 		CreatedAt: now,
-		UpdatedAt: now,
 	}, nil
 }
 
